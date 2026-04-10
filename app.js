@@ -23,7 +23,8 @@ let appState = {
 
 const AUTH_CREDENTIALS = {
     username: 'Atharv',
-    password: 'Civicsense'
+    password: 'Civicsense',
+    mobile: '7972113737'
 };
 
 const STORAGE_KEY = 'civicsense_user_session';
@@ -137,8 +138,17 @@ function subscribeToReports() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, (payload) => {
             if (payload.eventType === 'INSERT') {
                 appState.reports = [payload.new, ...appState.reports];
+                
+                // Admin Notification
+                triggerSMSNotification(AUTH_CREDENTIALS.mobile, `New Issue: "${payload.new.title}" reported in ${payload.new.location}!`);
             } else if (payload.eventType === 'UPDATE') {
+                const oldStatus = appState.reports.find(r => r.id === payload.new.id)?.status;
                 appState.reports = appState.reports.map(r => r.id === payload.new.id ? payload.new : r);
+                
+                // Citizen Notification
+                if (oldStatus !== 'RESOLVED' && payload.new.status === 'RESOLVED' && appState.user?.id === payload.new.citizen_id) {
+                    triggerSMSNotification(appState.user.mobile || 'N/A', `Great news! Your report "${payload.new.title}" has been resolved.`);
+                }
             } else if (payload.eventType === 'DELETE') {
                 appState.reports = appState.reports.filter(r => r.id !== payload.old.id);
             }
@@ -149,6 +159,51 @@ function subscribeToReports() {
             renderLandingFeed();
         })
         .subscribe();
+}
+
+// 4. Notification Engine (Simulated SMS)
+function triggerSMSNotification(to, message) {
+    const sound = document.getElementById('notification-sound');
+    if (sound) {
+        sound.currentTime = 0;
+        sound.play().catch(e => console.log("Audio play blocked by browser. Click anywhere to allow."));
+    }
+
+    const container = document.getElementById('mobile-notification-container');
+    const banner = document.createElement('div');
+    banner.className = 'sms-banner';
+    banner.innerHTML = `
+        <div class="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+            <i class="fas fa-comment-sms text-xl"></i>
+        </div>
+        <div class="flex-1 overflow-hidden">
+            <div class="flex items-center justify-between mb-0.5">
+                <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Messages</span>
+                <span class="text-[9px] font-bold text-slate-400">now</span>
+            </div>
+            <p class="text-[11px] font-black text-slate-900 leading-tight truncate">To: ${to}</p>
+            <p class="text-[12px] font-medium text-slate-600 leading-tight mt-1 line-clamp-2">${message}</p>
+        </div>
+    `;
+
+    container.appendChild(banner);
+
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        banner.classList.add('exit');
+        setTimeout(() => banner.remove(), 600);
+    }, 5000);
+
+    /* 
+    LIVE INTEGRATION (Twilio Placeholder)
+    --------------------------------------
+    To enable real SMS, replace the code above with an API call to your backend:
+    
+    fetch('/api/send-sms', {
+        method: 'POST',
+        body: JSON.stringify({ to, message })
+    });
+    */
 }
 
 // 4. Form Handlers

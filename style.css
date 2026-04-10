@@ -97,6 +97,35 @@
     from { opacity: 0; }
     to { opacity: 1; }
 }
+/* Mobile Notifications */
+#mobile-notification-container .sms-banner {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 2rem;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    max-width: 480px;
+    width: 100%;
+    animation: slideDownIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slideDownIn {
+    0% { transform: translateY(-150%) scale(0.9); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes slideUpOut {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(-150%) scale(0.9); opacity: 0; }
+}
+
+.sms-banner.exit {
+    animation: slideUpOut 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 
 @keyframes zoomIn {
     from { opacity: 0; transform: scale(0.95) translateY(10px); }
