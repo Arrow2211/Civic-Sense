@@ -161,14 +161,15 @@ function subscribeToReports() {
         .subscribe();
 }
 
-// 4. Notification Engine (Simulated SMS)
-function triggerSMSNotification(to, message) {
+// 4. Notification Engine (Real-World SMS via Vercel API)
+async function triggerSMSNotification(to, message) {
     const sound = document.getElementById('notification-sound');
     if (sound) {
         sound.currentTime = 0;
         sound.play().catch(e => console.log("Audio play blocked by browser. Click anywhere to allow."));
     }
 
+    // Trigger In-App Mobile Banner
     const container = document.getElementById('mobile-notification-container');
     const banner = document.createElement('div');
     banner.className = 'sms-banner';
@@ -185,25 +186,31 @@ function triggerSMSNotification(to, message) {
             <p class="text-[12px] font-medium text-slate-600 leading-tight mt-1 line-clamp-2">${message}</p>
         </div>
     `;
-
     container.appendChild(banner);
 
-    // Auto remove after 5 seconds
+    // Send Real SMS via Vercel Serverless Function
+    try {
+        const response = await fetch('/api/send-sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to, message })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            console.log("Real SMS sent successfully:", result.sid);
+        } else {
+            console.warn("SMS failed (is your Twilio SID/TOKEN set in Vercel?):", result.error);
+        }
+    } catch (err) {
+        console.error("SMS API Error:", err.message);
+    }
+
+    // Auto remove banner after 5 seconds
     setTimeout(() => {
         banner.classList.add('exit');
         setTimeout(() => banner.remove(), 600);
     }, 5000);
-
-    /* 
-    LIVE INTEGRATION (Twilio Placeholder)
-    --------------------------------------
-    To enable real SMS, replace the code above with an API call to your backend:
-    
-    fetch('/api/send-sms', {
-        method: 'POST',
-        body: JSON.stringify({ to, message })
-    });
-    */
 }
 
 // 4. Form Handlers
