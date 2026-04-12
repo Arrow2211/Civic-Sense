@@ -18,7 +18,11 @@ let appState = {
     generatedOtp: '',
     recoveryUser: null,
     viewingReportId: null,
-    resolvingId: null
+    resolvingId: null,
+    map: null,
+    marker: null,
+    geocoder: null,
+    tempCoords: null
 };
 
 const AUTH_CREDENTIALS = {
@@ -307,6 +311,8 @@ document.getElementById('report-form').onsubmit = async (e) => {
             description: formData.get('description'),
             category: formData.get('category'),
             location: formData.get('location'),
+            lat: formData.get('lat') ? parseFloat(formData.get('lat')) : null,
+            lng: formData.get('lng') ? parseFloat(formData.get('lng')) : null,
             timestamp: Date.now(),
             status: 'PENDING',
             media_url: base64,
@@ -767,5 +773,116 @@ window.handleResolve = async (e, reportId) => {
         renderLandingStats();
     }
 })();
+
+
+// 9. Google Maps & Geolocation
+window.openMapPicker = () => {
+    document.getElementById('map-picker-modal').classList.remove('hidden');
+    if (!appState.map) {
+        initMap();
+    } else {
+        // Center on existing or user location
+        getUserLocation();
+    }
+};
+
+window.closeMapPicker = () => {
+    document.getElementById('map-picker-modal').classList.add('hidden');
+};
+
+async function initMap() {
+    const defaultLocation = { lat: 19.0760, lng: 72.8777 }; // Mumbai
+    
+    appState.geocoder = new google.maps.Geocoder();
+    appState.map = new google.maps.Map(document.getElementById('google-map-container'), {
+        zoom: 15,
+        center: defaultLocation,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        styles: [
+            { "featureType": "poi", "elementType": "labels", "stylers": [{ "visibility": "off" }] }
+        ]
+    });
+
+    appState.marker = new google.maps.Marker({
+        position: defaultLocation,
+        map: appState.map,
+        draggable: true,
+        animation: google.maps.Animation.DROP,
+        icon: {
+            path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+            scale: 7,
+            fillColor: "#4f46e5",
+            fillOpacity: 1,
+            strokeWeight: 2,
+            strokeColor: "#ffffff",
+        }
+    });
+
+    // Hide loader
+    google.maps.event.addListenerOnce(appState.map, 'idle', () => {
+        document.getElementById('map-loading').classList.add('hidden');
+    });
+
+    // Marker drag event
+    appState.marker.addListener('dragend', () => {
+        const pos = appState.marker.getPosition();
+        reverseGeocode(pos);
+    });
+
+    // Map click event
+    appState.map.addListener('click', (e) => {
+        appState.marker.setPosition(e.latLng);
+        reverseGeocode(e.latLng);
+    });
+
+    getUserLocation();
+}
+
+function getUserLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const pos = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                appState.map.setCenter(pos);
+                appState.marker.setPosition(pos);
+                reverseGeocode(pos);
+            },
+            () => {
+                console.warn("Geolocation permission denied.");
+                reverseGeocode(appState.map.getCenter());
+            }
+        );
+    }
+}
+
+function reverseGeocode(latLng) {
+    appState.tempCoords = { lat: latLng.lat(), lng: latLng.lng() };
+    appState.geocoder.geocode({ location: latLng }, (results, status) => {
+        if (status === "OK" && results[0]) {
+            document.getElementById('map-selection-address').innerText = results[0].formatted_address;
+        } else {
+            document.getElementById('map-selection-address').innerText = `${latLng.lat().toFixed(4)}, ${latLng.lng().toFixed(4)}`;
+        }
+    });
+}
+
+window.confirmLocation = () => {
+    if (appState.tempCoords) {
+        document.getElementById('location-input').value = document.getElementById('map-selection-address').innerText;
+        document.getElementById('report-lat').value = appState.tempCoords.lat;
+        document.getElementById('report-lng').value = appState.tempCoords.lng;
+        closeMapPicker();
+        
+        // Trigger visual feedback
+        const input = document.getElementById('location-input');
+        input.classList.add('ring-4', 'ring-emerald-500/20', 'border-emerald-500');
+        setTimeout(() => input.classList.remove('ring-4', 'ring-emerald-500/20', 'border-emerald-500'), 2000);
+    }
+};
 
 window.navigateTo = navigateTo;

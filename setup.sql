@@ -44,6 +44,8 @@ CREATE TABLE public.reports (
     work_done_media_url TEXT, -- Proof image of resolution
     work_done_description TEXT, -- Description of fix
     resolved_at BIGINT,
+    lat DECIMAL, -- Latitude for Google Maps
+    lng DECIMAL, -- Longitude for Google Maps
     notified BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -87,7 +89,9 @@ INSERT INTO public.reports (
     status, 
     media_url, 
     media_type, 
-    ai_analysis
+    ai_analysis,
+    lat,
+    lng
 ) VALUES 
 (
     'cit_demo_001', 
@@ -100,7 +104,9 @@ INSERT INTO public.reports (
     'PENDING', 
     'https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&q=80&w=800', 
     'image', 
-    'AI Observation: Significant organic and plastic waste accumulation. Severity: High. Risk: Public health hazard near school.'
+    'AI Observation: Significant organic and plastic waste accumulation. Severity: High. Risk: Public health hazard near school.',
+    19.0760,
+    72.8777
 ),
 (
     'cit_demo_001', 
@@ -113,7 +119,9 @@ INSERT INTO public.reports (
     'PENDING', 
     'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&q=80&w=800', 
     'image', 
-    'AI Observation: Asphalt erosion detected. Depth exceeds 4 inches. Severity: Medium.'
+    'AI Observation: Asphalt erosion detected. Depth exceeds 4 inches. Severity: Medium.',
+    19.0850,
+    72.9000
 );
 
 -- 9. PERFORMANCE INDEXES
