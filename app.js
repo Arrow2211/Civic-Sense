@@ -2,6 +2,7 @@
 // CivicSense - Vanilla JS Core Logic
 const SUPABASE_URL = 'https://wnjizzmlovynxqtyfpih.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Induaml6em1sb3Z5bnhxdHlmcGloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MzQ5MzMsImV4cCI6MjA4NzAxMDkzM30.cmMEB0t2Z27dR5_9Gr_tK-1Ikz6mFLxaN5HtASxAtVE';
+const LOCATION_IQ_KEY = 'pk.3484f8fb96755ba8b6174e72ee6c21e5';
 
 const { createClient } = supabase;
 const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -828,8 +829,17 @@ async function initMap() {
         })
     }).addTo(appState.map);
 
-    // Add Geocoder (Search Bar)
+    // Add Geocoder (Search Bar using LocationIQ)
     const geocoder = L.Control.geocoder({
+        geocoder: L.Control.Geocoder.nominatim({
+            serviceUrl: "https://us1.locationiq.com/v1/",
+            geocodingQueryParams: {
+                key: LOCATION_IQ_KEY
+            },
+            reverseQueryParams: {
+                key: LOCATION_IQ_KEY
+            }
+        }),
         defaultMarkGeocode: false,
         placeholder: "Search for a location...",
         position: 'topleft'
@@ -935,11 +945,10 @@ async function reverseGeocode(latLng) {
     appState.tempCoords = { lat, lng };
     
     try {
-        // Using Nominatim API (Free OSM Geocoder)
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
+        // Using LocationIQ API (Pro-grade OSM Geocoder)
+        const response = await fetch(`https://us1.locationiq.com/v1/reverse.php?key=${LOCATION_IQ_KEY}&lat=${lat}&lon=${lng}&format=json&zoom=18&addressdetails=1`, {
             headers: {
-                'Accept-Language': 'en',
-                'User-Agent': 'CivicSense/1.0'
+                'Accept-Language': 'en'
             }
         });
         const data = await response.json();
