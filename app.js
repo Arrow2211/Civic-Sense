@@ -791,50 +791,57 @@ window.closeMapPicker = () => {
 };
 
 async function initMap() {
-    const defaultLocation = { lat: 19.0760, lng: 72.8777 }; // Mumbai
+    const defaultLocation = [19.0760, 72.8777]; // Mumbai [lat, lng]
     
-    appState.geocoder = new google.maps.Geocoder();
-    appState.map = new google.maps.Map(document.getElementById('google-map-container'), {
-        zoom: 15,
-        center: defaultLocation,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-        styles: [
-            { "featureType": "poi", "elementType": "labels", "stylers": [{ "visibility": "off" }] }
-        ]
-    });
+    // Initialize Leaflet map
+    appState.map = L.map('google-map-container', {
+        zoomControl: false,
+        attributionControl: true
+    }).setView(defaultLocation, 15);
 
-    appState.marker = new google.maps.Marker({
-        position: defaultLocation,
-        map: appState.map,
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(appState.map);
+
+    // Add zoom control to bottom right
+    L.control.zoom({
+        position: 'bottomright'
+    }).addTo(appState.map);
+
+    // Initialize Leaflet marker
+    appState.marker = L.marker(defaultLocation, {
         draggable: true,
-        animation: google.maps.Animation.DROP,
-        icon: {
-            path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-            scale: 7,
-            fillColor: "#4f46e5",
-            fillOpacity: 1,
-            strokeWeight: 2,
-            strokeColor: "#ffffff",
-        }
-    });
+        icon: L.divIcon({
+            className: 'custom-marker',
+            html: `
+                <div class="relative flex items-center justify-center">
+                    <div class="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-2xl border-4 border-white transform -translate-y-1/2">
+                        <i class="fas fa-location-arrow text-sm"></i>
+                    </div>
+                </div>
+            `,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20]
+        })
+    }).addTo(appState.map);
 
     // Hide loader
-    google.maps.event.addListenerOnce(appState.map, 'idle', () => {
+    appState.map.whenReady(() => {
         document.getElementById('map-loading').classList.add('hidden');
     });
 
     // Marker drag event
-    appState.marker.addListener('dragend', () => {
-        const pos = appState.marker.getPosition();
+    appState.marker.on('dragend', () => {
+        const pos = appState.marker.getLatLng();
         reverseGeocode(pos);
     });
 
     // Map click event
-    appState.map.addListener('click', (e) => {
-        appState.marker.setPosition(e.latLng);
-        reverseGeocode(e.latLng);
+    appState.map.on('click', (e) => {
+        appState.marker.setLatLng(e.latlng);
+        reverseGeocode(e.latlng);
     });
 
     getUserLocation();
@@ -842,33 +849,71 @@ async function initMap() {
 
 function getUserLocation() {
     if (navigator.geolocation) {
+        const loader = document.getElementById('map-loading');
+        if (loader) loader.classList.remove('hidden');
+
+        const options = {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        };
+
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                const pos = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                };
-                appState.map.setCenter(pos);
-                appState.marker.setPosition(pos);
-                reverseGeocode(pos);
+                const pos = [position.coords.latitude, position.coords.longitude];
+                if (appState.map) {
+                    appState.map.setView(pos, 15);
+                    appState.marker.setLatLng(pos);
+                    reverseGeocode({ lat: pos[0], lng: pos[1] });
+                }
+                if (loader) loader.classList.add('hidden');
             },
-            () => {
-                console.warn("Geolocation permission denied.");
-                reverseGeocode(appState.map.getCenter());
-            }
+            (error) => {
+                console.warn("Geolocation error:", error.message);
+                if (loader) loader.classList.add('hidden');
+                if (appState.map) {
+                    const center = appState.map.getCenter();
+                    reverseGeocode({ lat: center.lat, lng: center.lng });
+                }
+                
+                let msg = "Could not detect location. ";
+                if(error.code === 1) msg += "Please enable location permissions in your browser.";
+                else if(error.code === 3) msg += "Connection timed out.";
+                alert(msg);
+            },
+            options
         );
+    } else {
+        alert("Your browser does not support Geolocation.");
     }
 }
 
-function reverseGeocode(latLng) {
-    appState.tempCoords = { lat: latLng.lat(), lng: latLng.lng() };
-    appState.geocoder.geocode({ location: latLng }, (results, status) => {
-        if (status === "OK" && results[0]) {
-            document.getElementById('map-selection-address').innerText = results[0].formatted_address;
+async function reverseGeocode(latLng) {
+    // Standardize latLng input (Leaflet uses .lat and .lng)
+    const lat = latLng.lat !== undefined ? latLng.lat : latLng[0];
+    const lng = latLng.lng !== undefined ? latLng.lng : latLng[1];
+    
+    appState.tempCoords = { lat, lng };
+    
+    try {
+        // Using Nominatim API (Free OSM Geocoder)
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
+            headers: {
+                'Accept-Language': 'en',
+                'User-Agent': 'CivicSense/1.0'
+            }
+        });
+        const data = await response.json();
+        
+        if (data && data.display_name) {
+            document.getElementById('map-selection-address').innerText = data.display_name;
         } else {
-            document.getElementById('map-selection-address').innerText = `${latLng.lat().toFixed(4)}, ${latLng.lng().toFixed(4)}`;
+            document.getElementById('map-selection-address').innerText = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         }
-    });
+    } catch (err) {
+        console.error("Geocoding error:", err);
+        document.getElementById('map-selection-address').innerText = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
 }
 
 window.confirmLocation = () => {

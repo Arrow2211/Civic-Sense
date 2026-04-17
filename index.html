@@ -36,6 +36,8 @@
     <link rel="stylesheet" href="style.css">
     <!-- Supabase JS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body class="font-['Inter'] selection:bg-indigo-100 antialiased overflow-x-hidden">
 
@@ -394,10 +396,14 @@
                 </div>
                 <!-- Map Container -->
                 <div id="google-map-container" class="flex-1 min-h-[400px] relative">
-                    <div id="map-loading" class="absolute inset-0 bg-slate-100/50 backdrop-blur-sm flex flex-col items-center justify-center z-10">
+                    <div id="map-loading" class="absolute inset-0 bg-slate-100/50 backdrop-blur-sm flex flex-col items-center justify-center z-10 transition-opacity duration-300">
                         <div class="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-2"></div>
-                        <p class="text-xs font-black text-slate-400">Loading Map...</p>
+                        <p class="text-xs font-black text-slate-400">Locating...</p>
                     </div>
+                    <!-- Locate Me Toggle -->
+                    <button onclick="getUserLocation()" class="absolute bottom-6 right-6 w-12 h-12 bg-white text-indigo-600 rounded-full shadow-2xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all z-20 border border-slate-100 group" title="My Location">
+                        <i class="fas fa-location-arrow group-hover:animate-pulse"></i>
+                    </button>
                 </div>
                 <div class="p-6 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div class="flex-1 text-left w-full">
@@ -429,8 +435,8 @@
     <div id="mobile-notification-container" class="fixed top-6 left-0 right-0 z-[200] flex justify-center pointer-events-none px-4"></div>
     <audio id="notification-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
-    <!-- App Logic -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD062_NPY-XQ8EKxJwuvnfTH6uIqCg7zfc&libraries=places"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="app.js" type="module"></script>
 </body>
 </html>
