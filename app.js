@@ -880,15 +880,16 @@ async function initMap() {
     getUserLocation();
 }
 
-function getUserLocation() {
+function getUserLocation(isFallback = false) {
     if (navigator.geolocation) {
         const loader = document.getElementById('map-loading');
-        if (loader) loader.classList.remove('hidden');
+        if (loader && !isFallback) loader.classList.remove('hidden');
 
+        // Smart options: high accuracy first, then low accuracy fallback
         const options = {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
+            enableHighAccuracy: !isFallback,
+            timeout: isFallback ? 10000 : 15000, // Wait longer for GPS (high accuracy)
+            maximumAge: isFallback ? 300000 : 0 // 5 min cache allowed for fallback
         };
 
         navigator.geolocation.getCurrentPosition(
@@ -918,17 +919,24 @@ function getUserLocation() {
                 if (loader) loader.classList.add('hidden');
             },
             (error) => {
-                console.warn("Geolocation error:", error.message);
-                if (loader) loader.classList.add('hidden');
-                if (appState.map) {
-                    const center = appState.map.getCenter();
-                    reverseGeocode({ lat: center.lat, lng: center.lng });
+                // If high accuracy fails or times out, try one more time with low accuracy
+                if (!isFallback && (error.code === 3 || error.code === 2)) {
+                    console.warn("High accuracy failed or timed out, trying fast fallback...");
+                    getUserLocation(true);
+                } else {
+                    console.warn("Geolocation error:", error.message);
+                    if (loader) loader.classList.add('hidden');
+                    if (appState.map) {
+                        const center = appState.map.getCenter();
+                        reverseGeocode({ lat: center.lat, lng: center.lng });
+                    }
+                    
+                    let msg = "Could not detect location. ";
+                    if(error.code === 1) msg += "Please enable location permissions in your browser.";
+                    else if(error.code === 3) msg += "Connection timed out. Try moving near a window or outdoors.";
+                    else msg += error.message;
+                    alert(msg);
                 }
-                
-                let msg = "Could not detect location. ";
-                if(error.code === 1) msg += "Please enable location permissions in your browser.";
-                else if(error.code === 3) msg += "Connection timed out.";
-                alert(msg);
             },
             options
         );
