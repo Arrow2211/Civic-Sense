@@ -22,7 +22,8 @@ let appState = {
     map: null,
     marker: null,
     geocoder: null,
-    tempCoords: null
+    tempCoords: null,
+    accuracyCircle: null
 };
 
 const AUTH_CREDENTIALS = {
@@ -827,6 +828,28 @@ async function initMap() {
         })
     }).addTo(appState.map);
 
+    // Add Geocoder (Search Bar)
+    const geocoder = L.Control.geocoder({
+        defaultMarkGeocode: false,
+        placeholder: "Search for a location...",
+        position: 'topleft'
+    })
+    .on('markgeocode', function(e) {
+        const bbox = e.geocode.bbox;
+        const poly = L.polygon([
+            [bbox.getSouthEast().lat, bbox.getSouthEast().lng],
+            [bbox.getNorthEast().lat, bbox.getNorthEast().lng],
+            [bbox.getNorthWest().lat, bbox.getNorthWest().lng],
+            [bbox.getSouthWest().lat, bbox.getSouthWest().lng]
+        ]);
+        appState.map.fitBounds(poly.getBounds());
+        
+        const pos = e.geocode.center;
+        appState.marker.setLatLng(pos);
+        reverseGeocode(pos);
+    })
+    .addTo(appState.map);
+
     // Hide loader
     appState.map.whenReady(() => {
         document.getElementById('map-loading').classList.add('hidden');
@@ -860,11 +883,27 @@ function getUserLocation() {
 
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                const pos = [position.coords.latitude, position.coords.longitude];
+                const { latitude, longitude, accuracy } = position.coords;
+                const pos = [latitude, longitude];
+                
                 if (appState.map) {
-                    appState.map.setView(pos, 15);
+                    appState.map.setView(pos, 16);
                     appState.marker.setLatLng(pos);
-                    reverseGeocode({ lat: pos[0], lng: pos[1] });
+                    
+                    // Update accuracy circle
+                    if (appState.accuracyCircle) {
+                        appState.accuracyCircle.setLatLng(pos).setRadius(accuracy);
+                    } else {
+                        appState.accuracyCircle = L.circle(pos, {
+                            radius: accuracy,
+                            color: '#4f46e5',
+                            fillColor: '#4f46e5',
+                            fillOpacity: 0.15,
+                            weight: 1
+                        }).addTo(appState.map);
+                    }
+                    
+                    reverseGeocode({ lat: latitude, lng: longitude });
                 }
                 if (loader) loader.classList.add('hidden');
             },
@@ -906,7 +945,11 @@ async function reverseGeocode(latLng) {
         const data = await response.json();
         
         if (data && data.display_name) {
-            document.getElementById('map-selection-address').innerText = data.display_name;
+            // Clean up Nominatim address (often too long)
+            const parts = data.display_name.split(', ');
+            // Keep first 4-5 parts for a concise "Proper" address
+            const conciseAddress = parts.slice(0, 5).join(', ');
+            document.getElementById('map-selection-address').innerText = conciseAddress;
         } else {
             document.getElementById('map-selection-address').innerText = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         }
